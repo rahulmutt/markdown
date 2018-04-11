@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 module Text.Markdown.Block
     ( Block (..)
     , ListType (..)
+    , ColumnAlignment(..)
     , toBlocks
     , toBlockLines
     ) where
@@ -21,6 +23,8 @@ import Data.Conduit.Internal (pipeL)
 import qualified Data.Conduit.Text as CT
 import qualified Data.Conduit.List as CL
 import Data.Text (Text)
+import Data.Maybe (mapMaybe)
+import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Data.Char (isDigit)
 import Text.Markdown.Types
@@ -96,6 +100,7 @@ data LineType = LineList ListType Text
               | LineRule
               | LineHtml Text
               | LineReference Text Text -- ^ name, destination
+              | LineTable Int [Text] -- ^ components of the header
 
 lineType :: MarkdownSettings -> Text -> LineType
 lineType ms t
@@ -108,6 +113,7 @@ lineType ms t
     | isHtmlStart t = LineHtml t
     | Just (ltype, t') <- listStart t = LineList ltype t'
     | Just (name, dest) <- getReference t = LineReference name dest
+    | header@(_:_) <- tableColumns t = LineTable (length header) header
     | otherwise = LineText t
   where
     getFenced [] _ = Nothing
@@ -235,6 +241,42 @@ start ms t =
                 (mfinal, ls) <- takeTillConsume (\x -> isNonPara (lineType ms x) || listStartIndent x)
                 maybe (return ()) leftover mfinal
                 yield $ Right $ BlockPara $ T.intercalate "\n" $ t' : ls
+    go (LineTable n header) = do
+      border <- await
+      case fmap (lineType ms) border of
+        Just (LineTable n' header')
+          | n' == n
+          , Just alignedHeaders <- verifyBorder header header' -> do
+              let pad n' xs
+                    | n > n'    = xs ++ replicate (n - n') mempty
+                    | otherwise = take n xs
+                  isNonTable LineTable {} = False
+                  isNonTable LineText {} = False
+                  isNonTable _ = True
+              (mfinal, rows) <- takeTillConsume (isNonTable . lineType ms)
+              maybe (return ()) leftover mfinal
+              let allRows =
+                    map (\x -> case lineType ms x of
+                            LineTable n'' row -> pad n'' row
+                            LineText t -> pad 1 [t]
+                            line -> error "Invalid line token when parsing table.")
+                    rows
+              yield $ Right $ BlockTable alignedHeaders allRows
+        _ -> do
+          maybe (return ()) leftover border
+          go (LineText (T.intercalate "|" header))
+      where verifyBorder ts1 ts2
+              | length headers == length alignedHeaders = Just alignedHeaders
+              | otherwise = Nothing
+              where headers = zip ts1 ts2
+                    alignedHeaders = mapMaybe maybeBorder headers
+            stripColonsAndAlign x = (fromColons leftColon rightColon, z)
+              where (leftColon,  y) = maybe (False, x) (True,) $ T.stripPrefix ":" x
+                    (rightColon, z) = maybe (False, y) (True,) $ T.stripSuffix ":" y
+            maybeBorder (title, t)
+              | not (T.null t') && T.all (== '-') t' = Just (alignment, title)
+              | otherwise = Nothing
+              where (alignment, t') = stripColonsAndAlign $ T.strip t
 
 isHtmlStart :: T.Text -> Bool
 -- Allow for up to three spaces before the opening tag.
@@ -340,3 +382,14 @@ takeQuotes =
     go t
         | Just t' <- T.stripPrefix "> " t = yield t' >> takeQuotes
         | otherwise = yield t >> takeQuotes
+
+tableColumns :: Text -> [Text]
+tableColumns t = reverse $ go t mempty []
+  where go t prev xs
+          | T.null y = (if T.null x then [] else [x]) ++ xs
+          -- Make sure not to parse \| as a table separator
+          | not (T.null x) && T.last x == '\\' = go (T.drop 1 y) (prev <> x <> "|") xs
+          | otherwise = go (T.drop 1 y) mempty (if null xs && T.null x
+                                                then xs
+                                                else (prev <> x):xs)
+          where (x, y) = T.break (== '|') t

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Text.Markdown.Types where
 
+import Control.Arrow (second)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Default (Default (def))
@@ -162,6 +163,16 @@ htmlFencedHandler key start end = singleton key $ \lang -> FHParsed $ \blocks ->
 data ListType = Ordered | Unordered
   deriving (Show, Eq)
 
+data ColumnAlignment = AlignLeft | AlignCenter | AlignRight | AlignDefault
+  deriving (Show, Eq)
+
+fromColons :: Bool -> Bool -> ColumnAlignment
+fromColons left right
+  | left && right = AlignCenter
+  | left          = AlignLeft
+  | right         = AlignRight
+  | otherwise     = AlignDefault
+
 data Block inline
     = BlockPara inline
     | BlockList ListType (Either inline [Block inline])
@@ -172,6 +183,7 @@ data Block inline
     | BlockHeading Int inline
     | BlockReference Text Text
     | BlockPlainText inline
+    | BlockTable [(ColumnAlignment, inline)] [[inline]]
   deriving (Show, Eq)
 
 instance Functor Block where
@@ -185,6 +197,7 @@ instance Functor Block where
     fmap f (BlockHeading level i) = BlockHeading level (f i)
     fmap _ (BlockReference x y) = BlockReference x y
     fmap f (BlockPlainText x) = BlockPlainText (f x)
+    fmap f (BlockTable x y) = BlockTable (fmap (second f) x) (fmap (fmap f) y)
 
 data Inline = InlineText Text
             | InlineItalic [Inline]
