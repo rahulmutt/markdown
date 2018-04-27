@@ -183,7 +183,7 @@ data Block inline
     | BlockHeading Int inline
     | BlockReference Text Text
     | BlockPlainText inline
-    | BlockTable [(ColumnAlignment, inline)] [[inline]]
+    | BlockTable [(ColumnAlignment, Int, inline)] [[inline]]
   deriving (Show, Eq)
 
 instance Functor Block where
@@ -197,7 +197,7 @@ instance Functor Block where
     fmap f (BlockHeading level i) = BlockHeading level (f i)
     fmap _ (BlockReference x y) = BlockReference x y
     fmap f (BlockPlainText x) = BlockPlainText (f x)
-    fmap f (BlockTable x y) = BlockTable (fmap (second f) x) (fmap (fmap f) y)
+    fmap f (BlockTable x y) = BlockTable (fmap (\(a,b,c) -> (a,b,f c)) x) (fmap (fmap f) y)
 
 data Inline = InlineText Text
             | InlineItalic [Inline]

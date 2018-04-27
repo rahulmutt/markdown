@@ -274,7 +274,7 @@ start ms t =
               where (leftColon,  y) = maybe (False, x) (True,) $ T.stripPrefix ":" x
                     (rightColon, z) = maybe (False, y) (True,) $ T.stripSuffix ":" y
             maybeBorder (title, t)
-              | not (T.null t') && T.all (== '-') t' = Just (alignment, title)
+              | not (T.null t') && T.all (== '-') t' = Just (alignment, T.length t', title)
               | otherwise = Nothing
               where (alignment, t') = stripColonsAndAlign $ T.strip t
 
