@@ -93,7 +93,7 @@ inline refs =
     footnote = InlineFootnote <$> (string "{^" *> decimal <* char '}')
 
     escape = InlineText . T.singleton <$>
-        (char '\\' *> satisfy (`elem` ("\\`*_{}[]()#+-.!>" :: String)))
+        (char '\\' *> satisfy (`elem` ("\\`*_{}[]()#+-.!>|" :: String)))
 
     takeBalancedBrackets =
         T.pack <$> go (0 :: Int)
