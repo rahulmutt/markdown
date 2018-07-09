@@ -247,8 +247,8 @@ start ms t =
         Just (LineTable n' header')
           | n' == n
           , Just alignedHeaders <- verifyBorder header header' -> do
-              let pad n' xs
-                    | n > n'    = xs ++ replicate (n - n') mempty
+              let pad n'' xs
+                    | n > n''    = xs ++ replicate (n - n'') mempty
                     | otherwise = take n xs
                   isNonTable LineTable {} = False
                   isNonTable LineText {} = False
@@ -258,8 +258,8 @@ start ms t =
               let allRows =
                     map (\x -> case lineType ms x of
                             LineTable n'' row -> pad n'' row
-                            LineText t -> pad 1 [t]
-                            line -> error "Invalid line token when parsing table.")
+                            LineText t' -> pad 1 [t']
+                            _line -> error "Invalid line token when parsing table.")
                     rows
               yield $ Right $ BlockTable alignedHeaders allRows
         _ -> do
@@ -273,10 +273,10 @@ start ms t =
             stripColonsAndAlign x = (fromColons leftColon rightColon, z)
               where (leftColon,  y) = maybe (False, x) (True,) $ T.stripPrefix ":" x
                     (rightColon, z) = maybe (False, y) (True,) $ T.stripSuffix ":" y
-            maybeBorder (title, t)
+            maybeBorder (title, t'')
               | not (T.null t') && T.all (== '-') t' = Just (alignment, T.length t', title)
               | otherwise = Nothing
-              where (alignment, t') = stripColonsAndAlign $ T.strip t
+              where (alignment, t') = stripColonsAndAlign $ T.strip t''
 
 isHtmlStart :: T.Text -> Bool
 -- Allow for up to three spaces before the opening tag.

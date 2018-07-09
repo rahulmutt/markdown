@@ -1,13 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Text.Markdown.Types where
 
-import Control.Arrow (second)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Default (Default (def))
 import Data.Set (Set, empty)
 import Data.Map (Map, singleton)
-import Data.Monoid (mappend)
 import Text.Blaze.Html (Html)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as HA
